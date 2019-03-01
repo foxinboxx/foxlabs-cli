@@ -11,7 +11,7 @@
     
     <organization>
         <name>FoxLabs</name>
-        <url>http://foxlabs.org</url>
+        <url>https://foxlabs.org</url>
     </organization>
     
     <licenses>
@@ -28,7 +28,7 @@
             <name>Fox Mulder</name>
             <email>foxinboxx@gmail.com</email>
             <organization>FoxLabs</organization>
-            <organizationUrl>http://foxlabs.org</organizationUrl>
+            <organizationUrl>https://foxlabs.org</organizationUrl>
             <timezone>Asia/Novosibirsk</timezone>
             <roles>
                 <role>Java Developer</role>
@@ -47,8 +47,8 @@
     </issueManagement>
     
     <properties>
-        <maven.compiler.source>1.6</maven.compiler.source>
-        <maven.compiler.target>1.6</maven.compiler.target>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
     
@@ -56,13 +56,13 @@
         <dependency>
             <groupId>org.foxlabs</groupId>
             <artifactId>foxlabs-common</artifactId>
-            <version>1.1.1</version>
+            <version>1.1.2</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.foxlabs</groupId>
             <artifactId>foxlabs-validation</artifactId>
-            <version>1.1</version>
+            <version>1.1.1</version>
             <scope>compile</scope>
         </dependency>
         
