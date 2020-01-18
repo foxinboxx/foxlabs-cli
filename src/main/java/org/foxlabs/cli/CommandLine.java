@@ -18,7 +18,7 @@ package org.foxlabs.cli;
 
 /**
  * <p>This command line framework is tightly integrated with
- * <a href="http://foxlabs.org/p/validation/">FoxLabs Validation Framework</a>
+ * <a href="https://foxlabs.org/foxlabs-validation/">FoxLabs Validation Framework</a>
  * that provides powerful features used for conversion and validation of
  * command line options and arguments.</p>
  * 
