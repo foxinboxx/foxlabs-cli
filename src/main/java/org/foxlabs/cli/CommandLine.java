@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.Collections;
 import java.util.stream.Collectors;
+import java.util.function.Supplier;
 import java.util.concurrent.Callable;
 
 import org.foxlabs.validation.converter.Converter;
@@ -93,8 +94,9 @@ public class CommandLine {
    * @param <C> The type of the command handler.
    *
    * @author Fox Mulder
+   * @see Command.Builder
    */
-  public static final class Command<C extends Cloneable> extends ToString.Adapter {
+  public static final class Command<C> extends ToString.Adapter {
 
     /**
      * The name of the command.
@@ -117,9 +119,14 @@ public class CommandLine {
     private final Map<String, Command<?>> subcommands;
 
     /**
-     * The handler of the command.
+     * The provider of the command handlers.
      */
-    private C handler;
+    private Supplier<C> provider;
+
+    /**
+     * Whether the command is runnable.
+     */
+    private Boolean runnable;
 
     /**
      * Constructs a new command descriptor with the specified name.
@@ -147,7 +154,7 @@ public class CommandLine {
           new LinkedHashMap<>(builder.prototype.arguments));
       this.subcommands = Collections.unmodifiableMap(
           new LinkedHashMap<>(builder.prototype.subcommands));
-      this.handler = Objects.requireNonNull(builder.prototype.handler);
+      this.provider = Objects.requireNonNull(builder.prototype.provider);
     }
 
     /**
@@ -156,7 +163,7 @@ public class CommandLine {
      * @return The name of the command.
      */
     public String getName() {
-      return this.name;
+      return name;
     }
 
     /**
@@ -165,7 +172,7 @@ public class CommandLine {
      * @return The immutable map of options of the command.
      */
     public Map<String, Option<C, ?>> getOptions() {
-      return this.options;
+      return options;
     }
 
     /**
@@ -174,37 +181,44 @@ public class CommandLine {
      * @return The immutable map of arguments of the command.
      */
     public Map<String, Argument<C, ?>> getArguments() {
-      return this.arguments;
+      return arguments;
     }
 
     /**
-     * Returns subscommands of the command.
+     * Returns subcommands of the command.
      *
      * @return The immutable map of subcommands of the command.
      */
     public Map<String, Command<?>> getSubcommands() {
-      return this.subcommands;
+      return subcommands;
     }
 
     /**
-     * Returns copy of the command handler.
+     * Returns provider of the command handlers.
      *
-     * @return A copy of the command handler.
+     * @return The provider of the command handlers.
      */
-    public C getHandler() {
-      // FIXME Should return deep clone of the command handler
-      return this.handler;
+    public Supplier<C> getProvider() {
+      return provider;
     }
 
     /**
      * Determines whether the command can be executed or is just a parameters
      * holder.
      *
-     * @return {@code true} if the command can be executed.
+     * @return {@code true} if the command handler implements {@link Runnable}
+     *         or {@link Callable} interface.
      */
     public boolean isRunnable() {
-      return this.handler instanceof Runnable
-          || this.handler instanceof Callable;
+      if (runnable == null) {
+        if (provider != null) {
+          final C handler = provider.get();
+          runnable = handler instanceof Runnable || handler instanceof Callable;
+        } else {
+          return false;
+        }
+      }
+      return runnable;
     }
 
     /**
@@ -229,14 +243,14 @@ public class CommandLine {
      *
      * @param buffer The buffer to append.
      * @return A reference to the specified buffer.
-     * @see Option#toString(StringBuilder)
-     * @see Argument#toString(StringBuilder)
+     * @see CommandLine.Option#toString(StringBuilder)
+     * @see CommandLine.Argument#toString(StringBuilder)
      */
     @Override
     public StringBuilder toString(StringBuilder buffer) {
-      buffer.append(getName().toLowerCase());
-      getOptions().values().forEach((option) -> option.toString(buffer.append(" ")));
-      final Iterator<String> itr = getSubcommands().keySet().iterator();
+      buffer.append(name.toLowerCase());
+      options.values().forEach((option) -> option.toString(buffer.append(" ")));
+      final Iterator<String> itr = subcommands.keySet().iterator();
       if (itr.hasNext()) {
         buffer.append(" (");
         buffer.append(itr.next());
@@ -246,16 +260,32 @@ public class CommandLine {
           buffer.append("?");
         }
       }
-      getArguments().values().forEach((argument) -> argument.toString(buffer.append(" ")));
+      arguments.values().forEach((argument) -> argument.toString(buffer.append(" ")));
       return buffer;
     }
 
     // Command.Builder
 
-    public static abstract class Builder<R, C extends Cloneable> implements Buildable<R> {
+    /**
+     * The builder of the command descriptior.
+     *
+     * @param <R> The type of the {@link #build()} method result.
+     * @param <C> The type of the command handler.
+     *
+     * @author Fox Mulder
+     */
+    public static abstract class Builder<R, C> implements Buildable<R> {
 
+      /**
+       * The command prototype.
+       */
       private final Command<C> prototype;
 
+      /**
+       * Constructs a new command descriptor with the specified name.
+       *
+       * @param name The name of the command.
+       */
       private Builder(String name) {
         this.prototype = new Command<C>(name);
       }
@@ -278,7 +308,7 @@ public class CommandLine {
         };
       }
 
-      public <S extends Runnable & Cloneable> Command.Builder<Command.Builder<R, C>, S> subcommand(String name) {
+      public <S> Command.Builder<Command.Builder<R, C>, S> subcommand(String name) {
         return new Command.Builder<Command.Builder<R, C>, S>(name) {
           @Override public Command.Builder<R, C> build() {
             Command.Builder.this.prototype.subcommands.put(name.toLowerCase(), new Command<S>(this));
@@ -287,8 +317,14 @@ public class CommandLine {
         };
       }
 
-      public Command.Builder<R, C> handler(C handler) {
-        this.prototype.handler = Objects.requireNonNull(handler);
+      /**
+       * Sets provider of the command handlers.
+       *
+       * @param factory The provider of the command handlers.
+       * @return A reference to this builder.
+       */
+      public Command.Builder<R, C> provider(Supplier<C> factory) {
+        prototype.provider = Objects.requireNonNull(factory);
         return this;
       }
 
@@ -296,11 +332,11 @@ public class CommandLine {
        * Returns string representation of the builder current state.
        *
        * @return A string representation of the builder current state.
-       * @see Command#toString(StringBuilder)
+       * @see CommandLine.Command#toString(StringBuilder)
        */
       @Override
       public String toString() {
-        return this.prototype.toString();
+        return prototype.toString();
       }
 
     }
@@ -318,6 +354,7 @@ public class CommandLine {
    * @author Fox Mulder
    * @see Option
    * @see Argument
+   * @see Parameter.Builder
    */
   static abstract class Parameter<C, V> extends ToString.Adapter {
 
@@ -431,7 +468,7 @@ public class CommandLine {
      * @return The type of the parameter.
      */
     public Class<V> getType() {
-      return this.type;
+      return type;
     }
 
     /**
@@ -440,7 +477,7 @@ public class CommandLine {
      * @return The name of the parameter.
      */
     public String getName() {
-      return this.name;
+      return name;
     }
 
     /**
@@ -449,7 +486,7 @@ public class CommandLine {
      * @return The description of the parameter.
      */
     public String getDescription() {
-      return this.description;
+      return description;
     }
 
     /**
@@ -458,7 +495,7 @@ public class CommandLine {
      * @return The name of a system property.
      */
     public String getProperty() {
-      return this.property;
+      return property;
     }
 
     /**
@@ -468,7 +505,7 @@ public class CommandLine {
      * @return The name of an environment variable.
      */
     public String getVariable() {
-      return this.variable;
+      return variable;
     }
 
     /**
@@ -478,7 +515,7 @@ public class CommandLine {
      * @return The prompt message.
      */
     public String getPrompt() {
-      return this.prompt;
+      return prompt;
     }
 
     /**
@@ -487,7 +524,7 @@ public class CommandLine {
      * @return The converter of the parameter value.
      */
     public Converter<V> getConverter() {
-      return this.converter;
+      return converter;
     }
 
     /**
@@ -496,7 +533,7 @@ public class CommandLine {
      * @return The constraint of the parameter value.
      */
     public Constraint<? super V> getConstraint() {
-      return this.constraint;
+      return constraint;
     }
 
     /**
@@ -505,7 +542,7 @@ public class CommandLine {
      * @return The getter of the parameter value.
      */
     public Getter<C, V, ?> getGetter() {
-      return this.getter;
+      return getter;
     }
 
     /**
@@ -514,7 +551,7 @@ public class CommandLine {
      * @return The setter of the parameter value.
      */
     public Setter<C, V, ?> getSetter() {
-      return this.setter;
+      return setter;
     }
 
     /**
@@ -523,7 +560,7 @@ public class CommandLine {
      * @return {@code true} if the parameter value will be displayed.
      */
     public boolean isPassword() {
-      return this.password;
+      return password;
     }
 
     /**
@@ -532,7 +569,7 @@ public class CommandLine {
      * @return {@code true} if the parameter is required.
      */
     public boolean isRequired() {
-      return this.required;
+      return required;
     }
 
     /**
@@ -542,7 +579,7 @@ public class CommandLine {
      * @return {@code true} if the parameter is hidden.
      */
     public boolean isHidden() {
-      return this.hidden;
+      return hidden;
     }
 
     /**
@@ -562,9 +599,9 @@ public class CommandLine {
      * @return A reference to the specified buffer.
      */
     protected StringBuilder appendAttributes(StringBuilder buffer) {
-      buffer.append(getGetter() != null ? "R" : "");
-      buffer.append(getSetter() != null ? "W" : "");
-      buffer.append(isHidden() ? "H" : "");
+      buffer.append(getter != null ? "R" : "");
+      buffer.append(setter != null ? "W" : "");
+      buffer.append(hidden ? "H" : "");
       return buffer;
     }
 
@@ -589,18 +626,18 @@ public class CommandLine {
     protected StringBuilder appendDefaults(StringBuilder buffer) {
       String separator = "";
       // System property
-      if (Strings.isNonEmpty(getProperty())) {
-        buffer.append(separator).append("#{").append(getProperty()).append("}");
+      if (Strings.isNonEmpty(property)) {
+        buffer.append(separator).append("#{").append(property).append("}");
         separator = " | ";
       }
       // Environment variable
-      if (Strings.isNonEmpty(getVariable())) {
-        buffer.append(separator).append("${").append(getVariable()).append("}");
+      if (Strings.isNonEmpty(variable)) {
+        buffer.append(separator).append("${").append(variable).append("}");
         separator = " | ";
       }
       // Input prompt
-      if (Strings.isNonEmpty(getPrompt())) {
-        buffer.append(separator).append(isPassword() ? "***" : "?");
+      if (Strings.isNonEmpty(prompt)) {
+        buffer.append(separator).append(password ? "***" : "?");
         separator = " | ";
       }
       // Nothing of the above
@@ -652,7 +689,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B description(String text) {
-        this.prototype.description = Strings.requireNonBlank(text);
+        prototype.description = Strings.requireNonBlank(text);
         return (B) this;
       }
 
@@ -663,7 +700,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B property(String name) {
-        this.prototype.property = Strings.requireNonBlank(name);
+        prototype.property = Strings.requireNonBlank(name);
         return (B) this;
       }
 
@@ -674,7 +711,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B variable(String name) {
-        this.prototype.variable = Strings.requireNonBlank(name);
+        prototype.variable = Strings.requireNonBlank(name);
         return (B) this;
       }
 
@@ -686,7 +723,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B prompt(String message) {
-        this.prototype.prompt = Strings.requireNonBlank(message);
+        prototype.prompt = Strings.requireNonBlank(message);
         return (B) this;
       }
 
@@ -697,7 +734,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B converter(Converter<V> converter) {
-        this.prototype.converter = Objects.requireNonNull(converter);
+        prototype.converter = Objects.requireNonNull(converter);
         return (B) this;
       }
 
@@ -708,7 +745,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B constraint(Constraint<? super V> constraint) {
-        this.prototype.constraint = Objects.requireNonNull(constraint);
+        prototype.constraint = Objects.requireNonNull(constraint);
         return (B) this;
       }
 
@@ -719,7 +756,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B getter(Getter<C, V, ?> getter) {
-        this.prototype.getter = Objects.requireNonNull(getter);
+        prototype.getter = Objects.requireNonNull(getter);
         return (B) this;
       }
 
@@ -730,7 +767,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B setter(Setter<C, V, ?> setter) {
-        this.prototype.setter = Objects.requireNonNull(setter);
+        prototype.setter = Objects.requireNonNull(setter);
         return (B) this;
       }
 
@@ -740,7 +777,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B password() {
-        this.prototype.password = true;
+        prototype.password = true;
         return (B) this;
       }
 
@@ -750,7 +787,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B required() {
-        this.prototype.required = true;
+        prototype.required = true;
         return (B) this;
       }
 
@@ -760,7 +797,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B optional() {
-        this.prototype.required = false;
+        prototype.required = false;
         return (B) this;
       }
 
@@ -770,7 +807,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B hidden() {
-        this.prototype.hidden = true;
+        prototype.hidden = true;
         return (B) this;
       }
 
@@ -778,12 +815,12 @@ public class CommandLine {
        * Returns string representation of the builder current state.
        *
        * @return A string representation of the builder current state.
-       * @see Option#toString(StringBuilder)
-       * @see Argument#toString(StringBuilder)
+       * @see CommandLine.Option#toString(StringBuilder)
+       * @see CommandLine.Argument#toString(StringBuilder)
        */
       @Override
       public String toString() {
-        return this.prototype.toString();
+        return prototype.toString();
       }
 
     }
@@ -799,6 +836,7 @@ public class CommandLine {
    * @param <V> The type of the option value.
    *
    * @author Fox Mulder
+   * @see Option.Builder
    */
   public static final class Option<C, V> extends Parameter<C, V> {
 
@@ -842,7 +880,7 @@ public class CommandLine {
      * @return The immutable set of aliases of the option name.
      */
     public Set<String> getAliases() {
-      return this.aliases;
+      return aliases;
     }
 
 
@@ -875,12 +913,12 @@ public class CommandLine {
      */
     @Override
     public StringBuilder toString(StringBuilder buffer) {
-      buffer.append(isRequired() ? "<" : "[");
+      buffer.append(required ? "<" : "[");
       appendAttributes(buffer).append(" ");
-      buffer.append(getName());
-      getAliases().forEach((alias) -> buffer.append(" | ").append(alias));
-      buffer.append(" : ").append(getType().getName());
-      buffer.append(isRequired() ? ">" : "]");
+      buffer.append(name);
+      aliases.forEach((alias) -> buffer.append(" | ").append(alias));
+      buffer.append(" : ").append(type.getName());
+      buffer.append(required ? ">" : "]");
       appendDefaults(buffer.append(" = (")).append(")");
       return buffer;
     }
@@ -924,6 +962,7 @@ public class CommandLine {
    * @param <V> The type of the argument value.
    *
    * @author Fox Mulder
+   * @see Argument.Builder
    */
   public static final class Argument<C, V> extends Parameter<C, V> {
 
@@ -974,11 +1013,11 @@ public class CommandLine {
      */
     @Override
     public StringBuilder toString(StringBuilder buffer) {
-      buffer.append(isRequired() ? "<" : "[");
+      buffer.append(required ? "<" : "[");
       appendAttributes(buffer).append(" ");
-      buffer.append(getName().toUpperCase()).append(" : ").append(getType().getName());
+      buffer.append(name.toUpperCase()).append(" : ").append(type.getName());
       appendDefaults(buffer.append(" = (")).append(")");
-      buffer.append(isRequired() ? ">" : "]");
+      buffer.append(required ? ">" : "]");
       return buffer;
     }
 
