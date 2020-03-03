@@ -104,17 +104,17 @@ public class CommandLine {
     private final String name;
 
     /**
-     * The options of the command (keys are option names as is).
+     * The options of the command (keys are option names).
      */
     private final Map<String, Option<C, ?>> options;
 
     /**
-     * The arguments of the command (keys are argument names in upper case).
+     * The arguments of the command (keys are argument names).
      */
     private final Map<String, Argument<C, ?>> arguments;
 
     /**
-     * The subcommands of the command (keys are subcommand names in lower case).
+     * The subcommands of the command (keys are subcommand names).
      */
     private final Map<String, Command<?>> subcommands;
 
@@ -229,13 +229,13 @@ public class CommandLine {
      * The format is {@code <NAME> [OPTIONS] [SUBCOMMANDS] [ARGUMENTS]}.
      * Where:
      * <ul>
-     *   <li>{@code NAME} - the command name in lower case.</li>
+     *   <li>{@code NAME} - the command name.</li>
      *   <li>{@code OPTIONS} - a list of command options separated by a space
      *       character.</li>
-     *   <li>{@code SUBCOMMANDS} - a list of subcommand names in lower case
-     *       enclosed in the {@code ()} brackets and separated by the {@code |}
-     *       character. The leading {@code ?} character means that subcommands
-     *       are optional and the command can be executed on its own.</li>
+     *   <li>{@code SUBCOMMANDS} - a list of subcommand names enclosed in the
+     *       {@code ()} brackets and separated by the {@code |} character.
+     *       The leading {@code ?} character means that subcommands are optional
+     *       and the command can be executed on its own.</li>
      *   <li>{@code ARGUMENTS} - a list of command arguments separated by a
      *       space character.</li>
      * </ul>
@@ -248,7 +248,7 @@ public class CommandLine {
      */
     @Override
     public StringBuilder toString(StringBuilder buffer) {
-      buffer.append(name.toLowerCase());
+      buffer.append(name);
       options.values().forEach((option) -> option.toString(buffer.append(" ")));
       final Iterator<String> itr = subcommands.keySet().iterator();
       if (itr.hasNext()) {
@@ -290,29 +290,71 @@ public class CommandLine {
         this.prototype = new Command<C>(name);
       }
 
+      /**
+       * Returns reference to the {@link Option.Builder} for further option
+       * construction.
+       *
+       * @param <V> The type of the option value.
+       * @param type The type of the option.
+       * @param name The name of the option.
+       * @param aliases The aliases of the option name.
+       * @return A reference to the {@link Option.Builder}.
+       */
       public <V> Option.Builder<Command.Builder<R, C>, C, V> option(Class<V> type, String name, String... aliases) {
+        final Builder<R, C> self = this;
         return new Option.Builder<Command.Builder<R, C>, C, V>(type, name, aliases) {
           @Override public Command.Builder<R, C> build() {
-            Command.Builder.this.prototype.options.put(name, new Option<C, V>(this));
-            return Command.Builder.this;
+            final Option<C, V> option = new Option<>(this);
+            if (self.prototype.options.putIfAbsent(option.name, option) != null) {
+              throw new IllegalStateException("Command " + self.prototype.name +
+                  ": Option already defined: " + option.name);
+            }
+            return self;
           }
         };
       }
 
+      /**
+       * Returns reference to the {@link Argument.Builder} for further argument
+       * construction.
+       *
+       * @param <V> The type of the argument value.
+       * @param type The type of the argument.
+       * @param name The name of the argument.
+       * @return A reference to the {@link Argument.Builder}.
+       */
       public <V> Argument.Builder<Command.Builder<R, C>, C, V> argument(Class<V> type, String name) {
+        final Builder<R, C> self = this;
         return new Argument.Builder<Command.Builder<R, C>, C, V>(type, name) {
           @Override public Command.Builder<R, C> build() {
-            Command.Builder.this.prototype.arguments.put(name.toUpperCase(), new Argument<C, V>(this));
-            return Command.Builder.this;
+            final Argument<C, V> argument = new Argument<>(this);
+            if (self.prototype.arguments.putIfAbsent(argument.name, argument) != null) {
+              throw new IllegalStateException("Command " + self.prototype.name +
+                  ": Argument already defined: " + argument.name);
+            }
+            return self;
           }
         };
       }
 
+      /**
+       * Returns reference to the {@link Command.Builder} for further subcommand
+       * construction.
+       *
+       * @param <S> The type of the subcommand handler.
+       * @param name The name of the subcommand.
+       * @return A reference to the {@link Command.Builder}.
+       */
       public <S> Command.Builder<Command.Builder<R, C>, S> subcommand(String name) {
+        final Builder<R, C> self = this;
         return new Command.Builder<Command.Builder<R, C>, S>(name) {
           @Override public Command.Builder<R, C> build() {
-            Command.Builder.this.prototype.subcommands.put(name.toLowerCase(), new Command<S>(this));
-            return Command.Builder.this;
+            final Command<S> subcommand = new Command<>(this);
+            if (self.prototype.subcommands.putIfAbsent(subcommand.name, subcommand) != null) {
+              throw new IllegalStateException("Command " + self.prototype.name +
+                  ": Subcommand already defined: " + subcommand.name);
+            }
+            return self;
           }
         };
       }
@@ -898,7 +940,7 @@ public class CommandLine {
      *       following characters: {@code R} - readable (option has getter),
      *       {@code W} - writeable (option has setter), {@code H} - hidden
      *       (option should not appear in the usage and help output).</li>
-     *   <li>{@code NAME} - the name of the option unchanged.</li>
+     *   <li>{@code NAME} - the name of the option.</li>
      *   <li>{@code ALIASES} - a list of the option aliases separated by the
      *       {@code |} character.</li>
      *   <li>{@code TYPE} - the type name of the option.</li>
@@ -1000,7 +1042,7 @@ public class CommandLine {
      *       following characters: {@code R} - readable (argument has getter),
      *       {@code W} - writeable (argument has setter), {@code H} - hidden
      *       (parameter should not appear in the usage and help output).</li>
-     *   <li>{@code NAME} - the name of the argument in upper case.</li>
+     *   <li>{@code NAME} - the name of the argument.</li>
      *   <li>{@code TYPE} - the type name of the argument.</li>
      *   <li>{@code INIT} - the sequence of possible sources of the argument
      *       default value enclosed in the {@code ()} brackets and separated by
@@ -1015,7 +1057,7 @@ public class CommandLine {
     public StringBuilder toString(StringBuilder buffer) {
       buffer.append(required ? "<" : "[");
       appendAttributes(buffer).append(" ");
-      buffer.append(name.toUpperCase()).append(" : ").append(type.getName());
+      buffer.append(name).append(" : ").append(type.getName());
       appendDefaults(buffer.append(" = (")).append(")");
       buffer.append(required ? ">" : "]");
       return buffer;
