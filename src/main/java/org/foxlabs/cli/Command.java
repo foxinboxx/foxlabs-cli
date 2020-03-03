@@ -25,7 +25,7 @@ import java.lang.annotation.RetentionPolicy;
  * Declares a command.
  * 
  * @author Fox Mulder
- * @see CommandLine
+ * @see CommandLineParser
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
