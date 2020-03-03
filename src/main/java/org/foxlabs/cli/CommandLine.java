@@ -22,7 +22,6 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.Arrays;
-import java.util.Objects;
 import java.util.Collections;
 import java.util.stream.Collectors;
 import java.util.function.Supplier;
@@ -32,7 +31,7 @@ import org.foxlabs.validation.converter.Converter;
 import org.foxlabs.validation.converter.ConverterFactory;
 import org.foxlabs.validation.constraint.Constraint;
 import org.foxlabs.validation.constraint.ConstraintFactory;
-
+import org.foxlabs.util.Objects;
 import org.foxlabs.util.Strings;
 import org.foxlabs.util.ToString;
 import org.foxlabs.util.function.Buildable;
@@ -104,6 +103,11 @@ public class CommandLine {
     private final String name;
 
     /**
+     * The description of the command.
+     */
+    private String description;
+
+    /**
      * The options of the command (keys are option names).
      */
     private final Map<String, Option<C, ?>> options;
@@ -134,7 +138,7 @@ public class CommandLine {
      * @param name The name of the command.
      */
     private Command(String name) {
-      this.name = Strings.requireNonBlank(name);
+      this.name =  Objects.require(name, Strings::isNonWhitespaced);
       this.options = new LinkedHashMap<>();
       this.arguments = new LinkedHashMap<>();
       this.subcommands = new LinkedHashMap<>();
@@ -147,14 +151,18 @@ public class CommandLine {
      * @param builder The builder of the command descriptior.
      */
     private Command(Command.Builder<?, C> builder) {
+      // Check and set required properties first
+      this.provider = Objects.require(builder.prototype.provider);
+      // Name should already be checked
       this.name = builder.prototype.name;
+      // Set remaining properties
+      this.description = builder.prototype.description;
       this.options = Collections.unmodifiableMap(
           new LinkedHashMap<>(builder.prototype.options));
       this.arguments = Collections.unmodifiableMap(
           new LinkedHashMap<>(builder.prototype.arguments));
       this.subcommands = Collections.unmodifiableMap(
           new LinkedHashMap<>(builder.prototype.subcommands));
-      this.provider = Objects.requireNonNull(builder.prototype.provider);
     }
 
     /**
@@ -164,6 +172,15 @@ public class CommandLine {
      */
     public String getName() {
       return name;
+    }
+
+    /**
+     * Returns description of the command.
+     *
+     * @return The description of the command.
+     */
+    public String getDescription() {
+      return description;
     }
 
     /**
@@ -248,8 +265,11 @@ public class CommandLine {
      */
     @Override
     public StringBuilder toString(StringBuilder buffer) {
+      // <NAME>
       buffer.append(name);
+      // [OPTIONS]
       options.values().forEach((option) -> option.toString(buffer.append(" ")));
+      // [SUBCOMMANDS]
       final Iterator<String> itr = subcommands.keySet().iterator();
       if (itr.hasNext()) {
         buffer.append(" (");
@@ -260,7 +280,9 @@ public class CommandLine {
           buffer.append("?");
         }
       }
+      // [ARGUMENTS]
       arguments.values().forEach((argument) -> argument.toString(buffer.append(" ")));
+      // Done
       return buffer;
     }
 
@@ -291,14 +313,27 @@ public class CommandLine {
       }
 
       /**
-       * Returns reference to the {@link Option.Builder} for further option
-       * construction.
+       * Sets description of the command.
+       *
+       * @param text The description of the command.
+       * @return A reference to this builder.
+       */
+      public Command.Builder<R, C> description(String text) {
+        prototype.description = Objects.require(text, Strings::isNonBlank);
+        return this;
+      }
+
+      /**
+       * Returns reference to the {@link Option.Builder} for further
+       * construction of the command option.
        *
        * @param <V> The type of the option value.
        * @param type The type of the option.
        * @param name The name of the option.
        * @param aliases The aliases of the option name.
        * @return A reference to the {@link Option.Builder}.
+       * @throws IllegalStateException if option with the specified name is
+       *         already defined.
        */
       public <V> Option.Builder<Command.Builder<R, C>, C, V> option(Class<V> type, String name, String... aliases) {
         final Builder<R, C> self = this;
@@ -315,13 +350,15 @@ public class CommandLine {
       }
 
       /**
-       * Returns reference to the {@link Argument.Builder} for further argument
-       * construction.
+       * Returns reference to the {@link Argument.Builder} for further
+       * construction of the command argument.
        *
        * @param <V> The type of the argument value.
        * @param type The type of the argument.
        * @param name The name of the argument.
        * @return A reference to the {@link Argument.Builder}.
+       * @throws IllegalStateException if argument with the specified name is
+       *         already defined.
        */
       public <V> Argument.Builder<Command.Builder<R, C>, C, V> argument(Class<V> type, String name) {
         final Builder<R, C> self = this;
@@ -338,12 +375,14 @@ public class CommandLine {
       }
 
       /**
-       * Returns reference to the {@link Command.Builder} for further subcommand
-       * construction.
+       * Returns reference to the {@link Command.Builder} for further
+       * construction of the subcommand.
        *
        * @param <S> The type of the subcommand handler.
        * @param name The name of the subcommand.
        * @return A reference to the {@link Command.Builder}.
+       * @throws IllegalStateException if subcommand with the specified name is
+       *         already defined.
        */
       public <S> Command.Builder<Command.Builder<R, C>, S> subcommand(String name) {
         final Builder<R, C> self = this;
@@ -366,7 +405,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public Command.Builder<R, C> provider(Supplier<C> factory) {
-        prototype.provider = Objects.requireNonNull(factory);
+        prototype.provider = Objects.require(factory);
         return this;
       }
 
@@ -472,8 +511,8 @@ public class CommandLine {
      * @param name The name of the parameter.
      */
     private Parameter(Class<V> type, String name) {
-      this.type = Objects.requireNonNull(type);
-      this.name = Strings.requireNonBlank(name);
+      this.type = Objects.require(type);
+      this.name = Objects.require(name, Strings::isNonWhitespaced);
       // Set default converter and constraint
       this.converter = ConverterFactory.getDefaultConverter(this.type);
       this.constraint = ConstraintFactory.identity();
@@ -487,9 +526,9 @@ public class CommandLine {
      */
     private Parameter(Parameter.Builder<?, ?, C, V, ?> builder) {
       // Check and set required properties first
-      this.converter = Objects.requireNonNull(builder.prototype.converter);
-      this.constraint = Objects.requireNonNull(builder.prototype.constraint);
-      this.setter = Objects.requireNonNull(builder.prototype.setter);
+      this.converter = Objects.require(builder.prototype.converter);
+      this.constraint = Objects.require(builder.prototype.constraint);
+      this.setter = Objects.require(builder.prototype.setter);
       // Type and name should already be checked
       this.type = builder.prototype.type;
       this.name = builder.prototype.name;
@@ -731,7 +770,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B description(String text) {
-        prototype.description = Strings.requireNonBlank(text);
+        prototype.description = Objects.require(text, Strings::isNonBlank);
         return (B) this;
       }
 
@@ -742,7 +781,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B property(String name) {
-        prototype.property = Strings.requireNonBlank(name);
+        prototype.property = Objects.require(name, Strings::isNonWhitespaced);
         return (B) this;
       }
 
@@ -753,7 +792,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B variable(String name) {
-        prototype.variable = Strings.requireNonBlank(name);
+        prototype.variable = Objects.require(name, Strings::isNonWhitespaced);
         return (B) this;
       }
 
@@ -765,7 +804,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B prompt(String message) {
-        prototype.prompt = Strings.requireNonBlank(message);
+        prototype.prompt = Objects.require(message, Strings::isNonBlank);
         return (B) this;
       }
 
@@ -776,7 +815,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B converter(Converter<V> converter) {
-        prototype.converter = Objects.requireNonNull(converter);
+        prototype.converter = Objects.require(converter);
         return (B) this;
       }
 
@@ -787,7 +826,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B constraint(Constraint<? super V> constraint) {
-        prototype.constraint = Objects.requireNonNull(constraint);
+        prototype.constraint = Objects.require(constraint);
         return (B) this;
       }
 
@@ -798,7 +837,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B getter(Getter<C, V, ?> getter) {
-        prototype.getter = Objects.requireNonNull(getter);
+        prototype.getter = Objects.require(getter);
         return (B) this;
       }
 
@@ -809,7 +848,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B setter(Setter<C, V, ?> setter) {
-        prototype.setter = Objects.requireNonNull(setter);
+        prototype.setter = Objects.require(setter);
         return (B) this;
       }
 
@@ -899,7 +938,7 @@ public class CommandLine {
       super(type, name);
       this.aliases = aliases.length > 0
           ? Collections.unmodifiableSet(Arrays.stream(aliases)
-              .peek(Strings::requireNonBlank)
+              .peek((alias) -> Objects.require(alias, Strings::isNonWhitespaced))
               .filter((alias) -> !alias.equals(name))
               .collect(Collectors.<String, Set<String>>toCollection(LinkedHashSet::new)))
           : Collections.emptySet();
@@ -955,13 +994,21 @@ public class CommandLine {
      */
     @Override
     public StringBuilder toString(StringBuilder buffer) {
+      // <LB>
       buffer.append(required ? "<" : "[");
+      // [ATTRS]
       appendAttributes(buffer).append(" ");
+      // <NAME>
       buffer.append(name);
+      // [ALIASES]
       aliases.forEach((alias) -> buffer.append(" | ").append(alias));
+      // <TYPE>
       buffer.append(" : ").append(type.getName());
+      // <RB>
       buffer.append(required ? ">" : "]");
+      // <INIT>
       appendDefaults(buffer.append(" = (")).append(")");
+      // Done
       return buffer;
     }
 
@@ -1055,11 +1102,17 @@ public class CommandLine {
      */
     @Override
     public StringBuilder toString(StringBuilder buffer) {
+      // <LB>
       buffer.append(required ? "<" : "[");
+      // [ATTRS]
       appendAttributes(buffer).append(" ");
+      // <NAME> : <TYPE>
       buffer.append(name).append(" : ").append(type.getName());
+      // <INIT>
       appendDefaults(buffer.append(" = (")).append(")");
+      // <RB>
       buffer.append(required ? ">" : "]");
+      // Done
       return buffer;
     }
 
