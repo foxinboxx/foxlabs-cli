@@ -27,16 +27,19 @@ import java.util.stream.Collectors;
 import java.util.function.Supplier;
 import java.util.concurrent.Callable;
 
+import org.foxlabs.common.Objects;
+import org.foxlabs.common.Strings;
+import org.foxlabs.common.function.ToString;
+import org.foxlabs.common.function.Buildable;
+import org.foxlabs.common.function.Getter;
+import org.foxlabs.common.function.Setter;
+
 import org.foxlabs.validation.converter.Converter;
 import org.foxlabs.validation.converter.ConverterFactory;
 import org.foxlabs.validation.constraint.Constraint;
 import org.foxlabs.validation.constraint.ConstraintFactory;
-import org.foxlabs.util.Objects;
-import org.foxlabs.util.Strings;
-import org.foxlabs.util.ToString;
-import org.foxlabs.util.function.Buildable;
-import org.foxlabs.util.function.Getter;
-import org.foxlabs.util.function.Setter;
+
+import static org.foxlabs.common.Predicates.*;
 
 /**
  *
@@ -78,8 +81,7 @@ public class CommandLine {
       };
     }
 
-    @Override
-    public CommandLine build() {
+    @Override public CommandLine build() {
       return new CommandLine(this);
     }
 
@@ -138,7 +140,7 @@ public class CommandLine {
      * @param name The name of the command.
      */
     private Command(String name) {
-      this.name =  Objects.require(name, Strings::isNonWhitespaced);
+      this.name =  require(name, STRING_NON_WHITESPACED);
       this.options = new LinkedHashMap<>();
       this.arguments = new LinkedHashMap<>();
       this.subcommands = new LinkedHashMap<>();
@@ -148,11 +150,11 @@ public class CommandLine {
      * Constructs a new command descriptor and initializes its properties
      * with properties of the specified builder.
      *
-     * @param builder The builder of the command descriptior.
+     * @param builder The builder of the command descriptor.
      */
     private Command(Command.Builder<?, C> builder) {
       // Check and set required properties first
-      this.provider = Objects.require(builder.prototype.provider);
+      this.provider = requireNonNull(builder.prototype.provider);
       // Name should already be checked
       this.name = builder.prototype.name;
       // Set remaining properties
@@ -263,8 +265,7 @@ public class CommandLine {
      * @see CommandLine.Option#toString(StringBuilder)
      * @see CommandLine.Argument#toString(StringBuilder)
      */
-    @Override
-    public StringBuilder toString(StringBuilder buffer) {
+    @Override public StringBuilder toString(StringBuilder buffer) {
       // <NAME>
       buffer.append(name);
       // [OPTIONS]
@@ -289,7 +290,7 @@ public class CommandLine {
     // Command.Builder
 
     /**
-     * The builder of the command descriptior.
+     * The builder of the command descriptor.
      *
      * @param <R> The type of the {@link #build()} method result.
      * @param <C> The type of the command handler.
@@ -319,7 +320,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public Command.Builder<R, C> description(String text) {
-        prototype.description = Objects.require(text, Strings::isNonBlank);
+        prototype.description = require(text, STRING_NON_BLANK);
         return this;
       }
 
@@ -405,7 +406,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public Command.Builder<R, C> provider(Supplier<C> factory) {
-        prototype.provider = Objects.require(factory);
+        prototype.provider = requireNonNull(factory);
         return this;
       }
 
@@ -415,8 +416,7 @@ public class CommandLine {
        * @return A string representation of the builder current state.
        * @see CommandLine.Command#toString(StringBuilder)
        */
-      @Override
-      public String toString() {
+      @Override public String toString() {
         return prototype.toString();
       }
 
@@ -511,33 +511,31 @@ public class CommandLine {
      * @param name The name of the parameter.
      */
     private Parameter(Class<V> type, String name) {
-      this.type = Objects.require(type);
-      this.name = Objects.require(name, Strings::isNonWhitespaced);
-      // Set default converter and constraint
+      this.type = requireNonNull(type);
+      this.name = require(name, STRING_NON_WHITESPACED);
       this.converter = ConverterFactory.getDefaultConverter(this.type);
       this.constraint = ConstraintFactory.identity();
+      this.getter = Getter.nullStub();
+      this.setter = Setter.unsupportedStub();
     }
 
     /**
      * Constructs a new parameter descriptor and initializes its properties
      * with properties of the specified builder.
      *
-     * @param builder The builder of the parameter descriptior.
+     * @param builder The builder of the parameter descriptor.
      */
     private Parameter(Parameter.Builder<?, ?, C, V, ?> builder) {
-      // Check and set required properties first
-      this.converter = Objects.require(builder.prototype.converter);
-      this.constraint = Objects.require(builder.prototype.constraint);
-      this.setter = Objects.require(builder.prototype.setter);
-      // Type and name should already be checked
       this.type = builder.prototype.type;
       this.name = builder.prototype.name;
-      // Set remaining properties
       this.description = builder.prototype.description;
       this.property = builder.prototype.property;
       this.variable = builder.prototype.variable;
       this.prompt = builder.prototype.prompt;
+      this.constraint = builder.prototype.constraint;
+      this.converter = builder.prototype.converter;
       this.getter = builder.prototype.getter;
+      this.setter = builder.prototype.setter;
       this.password = builder.prototype.password;
       this.required = builder.prototype.required;
       this.hidden = builder.prototype.hidden;
@@ -670,7 +668,7 @@ public class CommandLine {
      * The possible characters of the attributes string are:
      * <ul>
      *   <li>{@code R} - readable (parameter has getter).</li>
-     *   <li>{@code W} - writeable (parameter has setter).</li>
+     *   <li>{@code W} - writable (parameter has setter).</li>
      *   <li>{@code H} - hidden (parameter should not appear in the usage and
      *       help output).</li>
      * </ul>
@@ -732,7 +730,7 @@ public class CommandLine {
     // Parameter.Builder
 
     /**
-     * The builder of the parameter descriptior.
+     * The builder of the parameter descriptor.
      *
      * @param <B> The type of the builder subclass.
      * @param <R> The type of the {@link #build()} method result.
@@ -744,7 +742,6 @@ public class CommandLine {
      * @see Option.Builder
      * @see Argument.Builder
      */
-    @SuppressWarnings("unchecked")
     static abstract class Builder<B extends Builder<B, R, C, V, P>, R, C, V, P extends Parameter<C, V>>
         implements Buildable<R> {
 
@@ -770,8 +767,8 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B description(String text) {
-        prototype.description = Objects.require(text, Strings::isNonBlank);
-        return (B) this;
+        prototype.description = require(text, STRING_NON_BLANK);
+        return Objects.cast(this);
       }
 
       /**
@@ -781,8 +778,8 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B property(String name) {
-        prototype.property = Objects.require(name, Strings::isNonWhitespaced);
-        return (B) this;
+        prototype.property = require(name, STRING_NON_WHITESPACED);
+        return Objects.cast(this);
       }
 
       /**
@@ -792,8 +789,8 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B variable(String name) {
-        prototype.variable = Objects.require(name, Strings::isNonWhitespaced);
-        return (B) this;
+        prototype.variable = require(name, STRING_NON_WHITESPACED);
+        return Objects.cast(this);
       }
 
       /**
@@ -804,8 +801,8 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B prompt(String message) {
-        prototype.prompt = Objects.require(message, Strings::isNonBlank);
-        return (B) this;
+        prototype.prompt = require(message, STRING_NON_BLANK);
+        return Objects.cast(this);
       }
 
       /**
@@ -815,8 +812,8 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B converter(Converter<V> converter) {
-        prototype.converter = Objects.require(converter);
-        return (B) this;
+        prototype.converter = requireNonNull(converter);
+        return Objects.cast(this);
       }
 
       /**
@@ -826,8 +823,8 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B constraint(Constraint<? super V> constraint) {
-        prototype.constraint = Objects.require(constraint);
-        return (B) this;
+        prototype.constraint = requireNonNull(constraint);
+        return Objects.cast(this);
       }
 
       /**
@@ -837,8 +834,8 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B getter(Getter<C, V, ?> getter) {
-        prototype.getter = Objects.require(getter);
-        return (B) this;
+        prototype.getter = requireNonNull(getter);
+        return Objects.cast(this);
       }
 
       /**
@@ -848,8 +845,8 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B setter(Setter<C, V, ?> setter) {
-        prototype.setter = Objects.require(setter);
-        return (B) this;
+        prototype.setter = requireNonNull(setter);
+        return Objects.cast(this);
       }
 
       /**
@@ -859,7 +856,7 @@ public class CommandLine {
        */
       public B password() {
         prototype.password = true;
-        return (B) this;
+        return Objects.cast(this);
       }
 
       /**
@@ -869,7 +866,7 @@ public class CommandLine {
        */
       public B required() {
         prototype.required = true;
-        return (B) this;
+        return Objects.cast(this);
       }
 
       /**
@@ -879,7 +876,7 @@ public class CommandLine {
        */
       public B optional() {
         prototype.required = false;
-        return (B) this;
+        return Objects.cast(this);
       }
 
       /**
@@ -889,7 +886,7 @@ public class CommandLine {
        */
       public B hidden() {
         prototype.hidden = true;
-        return (B) this;
+        return Objects.cast(this);
       }
 
       /**
@@ -899,8 +896,7 @@ public class CommandLine {
        * @see CommandLine.Option#toString(StringBuilder)
        * @see CommandLine.Argument#toString(StringBuilder)
        */
-      @Override
-      public String toString() {
+      @Override public String toString() {
         return prototype.toString();
       }
 
@@ -938,7 +934,7 @@ public class CommandLine {
       super(type, name);
       this.aliases = aliases.length > 0
           ? Collections.unmodifiableSet(Arrays.stream(aliases)
-              .peek((alias) -> Objects.require(alias, Strings::isNonWhitespaced))
+              .peek((alias) -> require(alias, STRING_NON_WHITESPACED))
               .filter((alias) -> !alias.equals(name))
               .collect(Collectors.<String, Set<String>>toCollection(LinkedHashSet::new)))
           : Collections.emptySet();
@@ -948,7 +944,7 @@ public class CommandLine {
      * Constructs a new option descriptor and initializes its properties
      * with properties of the specified builder.
      *
-     * @param builder The builder of the option descriptior.
+     * @param builder The builder of the option descriptor.
      */
     private Option(Option.Builder<?, C, V> builder) {
       super(builder);
@@ -977,7 +973,7 @@ public class CommandLine {
      *       required option and {@code []} for optional).
      *   <li>{@code ATTRS} - the option attributes string consists of the
      *       following characters: {@code R} - readable (option has getter),
-     *       {@code W} - writeable (option has setter), {@code H} - hidden
+     *       {@code W} - writable (option has setter), {@code H} - hidden
      *       (option should not appear in the usage and help output).</li>
      *   <li>{@code NAME} - the name of the option.</li>
      *   <li>{@code ALIASES} - a list of the option aliases separated by the
@@ -992,8 +988,7 @@ public class CommandLine {
      * @param buffer The buffer to append.
      * @return A reference to the specified buffer.
      */
-    @Override
-    public StringBuilder toString(StringBuilder buffer) {
+    @Override public StringBuilder toString(StringBuilder buffer) {
       // <LB>
       buffer.append(required ? "<" : "[");
       // [ATTRS]
@@ -1015,7 +1010,7 @@ public class CommandLine {
     // Option.Builder
 
     /**
-     * The builder of the option descriptior.
+     * The builder of the option descriptor.
      *
      * @param <R> The type of the {@link #build()} method result.
      * @param <C> The type of the owner command handler.
@@ -1069,7 +1064,7 @@ public class CommandLine {
      * Constructs a new argument descriptor and initializes its properties
      * with properties of the specified builder.
      *
-     * @param builder The builder of the argument descriptior.
+     * @param builder The builder of the argument descriptor.
      */
     private Argument(Argument.Builder<?, C, V> builder) {
       super(builder);
@@ -1087,7 +1082,7 @@ public class CommandLine {
      *       required argument and {@code []} for optional).
      *   <li>{@code ATTRS} - the argument attributes string consists of the
      *       following characters: {@code R} - readable (argument has getter),
-     *       {@code W} - writeable (argument has setter), {@code H} - hidden
+     *       {@code W} - writable (argument has setter), {@code H} - hidden
      *       (parameter should not appear in the usage and help output).</li>
      *   <li>{@code NAME} - the name of the argument.</li>
      *   <li>{@code TYPE} - the type name of the argument.</li>
@@ -1100,8 +1095,7 @@ public class CommandLine {
      * @param buffer The buffer to append.
      * @return A reference to the specified buffer.
      */
-    @Override
-    public StringBuilder toString(StringBuilder buffer) {
+    @Override public StringBuilder toString(StringBuilder buffer) {
       // <LB>
       buffer.append(required ? "<" : "[");
       // [ATTRS]
@@ -1119,7 +1113,7 @@ public class CommandLine {
     // Argument.Builder
 
     /**
-     * The builder of the argument descriptior.
+     * The builder of the argument descriptor.
      *
      * @param <R> The type of the {@link #build()} method result.
      * @param <C> The type of the owner command handler.
