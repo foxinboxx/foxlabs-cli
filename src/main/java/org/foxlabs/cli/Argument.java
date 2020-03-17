@@ -31,7 +31,7 @@ import java.lang.annotation.RetentionPolicy;
  * should have corresponding setter methods).</p>
  * 
  * @author Fox Mulder
- * @see CommandLine
+ * @see CommandLineParser
  */
 @Target({ElementType.FIELD, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)

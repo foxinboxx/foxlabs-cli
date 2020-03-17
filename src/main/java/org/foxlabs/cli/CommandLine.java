@@ -30,6 +30,7 @@ import java.util.concurrent.Callable;
 import org.foxlabs.common.Objects;
 import org.foxlabs.common.Strings;
 import org.foxlabs.common.function.ToString;
+import org.foxlabs.common.text.CharBuffer;
 import org.foxlabs.common.function.Buildable;
 import org.foxlabs.common.function.Getter;
 import org.foxlabs.common.function.Setter;
@@ -261,11 +262,12 @@ public class CommandLine {
      * </p>
      *
      * @param buffer The buffer to append.
+     * @param threshold The maximum length that the specified buffer is limited to.
      * @return A reference to the specified buffer.
      * @see CommandLine.Option#toString(StringBuilder)
      * @see CommandLine.Argument#toString(StringBuilder)
      */
-    @Override public StringBuilder toString(StringBuilder buffer) {
+    @Override public CharBuffer toString(CharBuffer buffer) {
       // <NAME>
       buffer.append(name);
       // [OPTIONS]
@@ -677,7 +679,7 @@ public class CommandLine {
      * @param buffer The buffer to append.
      * @return A reference to the specified buffer.
      */
-    protected StringBuilder appendAttributes(StringBuilder buffer) {
+    protected CharBuffer appendAttributes(CharBuffer buffer) {
       buffer.append(getter != null ? "R" : "");
       buffer.append(setter != null ? "W" : "");
       buffer.append(hidden ? "H" : "");
@@ -702,7 +704,7 @@ public class CommandLine {
      * @param buffer The buffer to append.
      * @return A reference to the specified buffer.
      */
-    protected StringBuilder appendDefaults(StringBuilder buffer) {
+    protected CharBuffer appendDefaults(CharBuffer buffer) {
       String separator = "";
       // System property
       if (Strings.isNonEmpty(property)) {
@@ -988,7 +990,7 @@ public class CommandLine {
      * @param buffer The buffer to append.
      * @return A reference to the specified buffer.
      */
-    @Override public StringBuilder toString(StringBuilder buffer) {
+    @Override public CharBuffer toString(CharBuffer buffer) {
       // <LB>
       buffer.append(required ? "<" : "[");
       // [ATTRS]
@@ -1095,7 +1097,7 @@ public class CommandLine {
      * @param buffer The buffer to append.
      * @return A reference to the specified buffer.
      */
-    @Override public StringBuilder toString(StringBuilder buffer) {
+    @Override public CharBuffer toString(CharBuffer buffer) {
       // <LB>
       buffer.append(required ? "<" : "[");
       // [ATTRS]
