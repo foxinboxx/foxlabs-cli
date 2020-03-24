@@ -27,10 +27,11 @@ import java.util.stream.Collectors;
 import java.util.function.Supplier;
 import java.util.concurrent.Callable;
 
+import org.foxlabs.common.Checks;
 import org.foxlabs.common.Objects;
 import org.foxlabs.common.Strings;
-import org.foxlabs.common.function.ToString;
 import org.foxlabs.common.text.CharBuffer;
+import org.foxlabs.common.text.ToString;
 import org.foxlabs.common.function.Buildable;
 import org.foxlabs.common.function.Getter;
 import org.foxlabs.common.function.Setter;
@@ -39,8 +40,6 @@ import org.foxlabs.validation.converter.Converter;
 import org.foxlabs.validation.converter.ConverterFactory;
 import org.foxlabs.validation.constraint.Constraint;
 import org.foxlabs.validation.constraint.ConstraintFactory;
-
-import static org.foxlabs.common.Predicates.*;
 
 /**
  *
@@ -82,7 +81,8 @@ public class CommandLine {
       };
     }
 
-    @Override public CommandLine build() {
+    @Override
+    public CommandLine build() {
       return new CommandLine(this);
     }
 
@@ -141,7 +141,7 @@ public class CommandLine {
      * @param name The name of the command.
      */
     private Command(String name) {
-      this.name =  require(name, STRING_NON_WHITESPACED);
+      this.name = Checks.checkThat(name, Strings.isNonWhitespaced(name));
       this.options = new LinkedHashMap<>();
       this.arguments = new LinkedHashMap<>();
       this.subcommands = new LinkedHashMap<>();
@@ -155,7 +155,7 @@ public class CommandLine {
      */
     private Command(Command.Builder<?, C> builder) {
       // Check and set required properties first
-      this.provider = requireNonNull(builder.prototype.provider);
+      this.provider = Checks.checkNotNull(builder.prototype.provider);
       // Name should already be checked
       this.name = builder.prototype.name;
       // Set remaining properties
@@ -267,7 +267,8 @@ public class CommandLine {
      * @see CommandLine.Option#toString(StringBuilder)
      * @see CommandLine.Argument#toString(StringBuilder)
      */
-    @Override public CharBuffer toString(CharBuffer buffer) {
+    @Override
+    public CharBuffer toString(CharBuffer buffer) {
       // <NAME>
       buffer.append(name);
       // [OPTIONS]
@@ -322,7 +323,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public Command.Builder<R, C> description(String text) {
-        prototype.description = require(text, STRING_NON_BLANK);
+        prototype.description = Checks.checkThat(text, Strings.isNonBlank(text));
         return this;
       }
 
@@ -408,7 +409,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public Command.Builder<R, C> provider(Supplier<C> factory) {
-        prototype.provider = requireNonNull(factory);
+        prototype.provider = Checks.checkNotNull(factory);
         return this;
       }
 
@@ -418,7 +419,8 @@ public class CommandLine {
        * @return A string representation of the builder current state.
        * @see CommandLine.Command#toString(StringBuilder)
        */
-      @Override public String toString() {
+      @Override
+      public String toString() {
         return prototype.toString();
       }
 
@@ -513,8 +515,8 @@ public class CommandLine {
      * @param name The name of the parameter.
      */
     private Parameter(Class<V> type, String name) {
-      this.type = requireNonNull(type);
-      this.name = require(name, STRING_NON_WHITESPACED);
+      this.type = Checks.checkNotNull(type);
+      this.name = Checks.checkThat(name, Strings.isNonWhitespaced(name));
       this.converter = ConverterFactory.getDefaultConverter(this.type);
       this.constraint = ConstraintFactory.identity();
       this.getter = Getter.nullStub();
@@ -769,7 +771,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B description(String text) {
-        prototype.description = require(text, STRING_NON_BLANK);
+        prototype.description = Checks.checkThat(text, Strings.isNonBlank(text));
         return Objects.cast(this);
       }
 
@@ -780,7 +782,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B property(String name) {
-        prototype.property = require(name, STRING_NON_WHITESPACED);
+        prototype.property = Checks.checkThat(name, Strings.isNonWhitespaced(name));
         return Objects.cast(this);
       }
 
@@ -791,7 +793,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B variable(String name) {
-        prototype.variable = require(name, STRING_NON_WHITESPACED);
+        prototype.variable = Checks.checkThat(name, Strings.isNonWhitespaced(name));
         return Objects.cast(this);
       }
 
@@ -803,7 +805,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B prompt(String message) {
-        prototype.prompt = require(message, STRING_NON_BLANK);
+        prototype.prompt = Checks.checkThat(message, Strings.isNonBlank(message));
         return Objects.cast(this);
       }
 
@@ -814,7 +816,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B converter(Converter<V> converter) {
-        prototype.converter = requireNonNull(converter);
+        prototype.converter = Checks.checkNotNull(converter);
         return Objects.cast(this);
       }
 
@@ -825,7 +827,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B constraint(Constraint<? super V> constraint) {
-        prototype.constraint = requireNonNull(constraint);
+        prototype.constraint = Checks.checkNotNull(constraint);
         return Objects.cast(this);
       }
 
@@ -836,7 +838,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B getter(Getter<C, V, ?> getter) {
-        prototype.getter = requireNonNull(getter);
+        prototype.getter = Checks.checkNotNull(getter);
         return Objects.cast(this);
       }
 
@@ -847,7 +849,7 @@ public class CommandLine {
        * @return A reference to this builder.
        */
       public B setter(Setter<C, V, ?> setter) {
-        prototype.setter = requireNonNull(setter);
+        prototype.setter = Checks.checkNotNull(setter);
         return Objects.cast(this);
       }
 
@@ -898,7 +900,8 @@ public class CommandLine {
        * @see CommandLine.Option#toString(StringBuilder)
        * @see CommandLine.Argument#toString(StringBuilder)
        */
-      @Override public String toString() {
+      @Override
+      public String toString() {
         return prototype.toString();
       }
 
@@ -936,7 +939,7 @@ public class CommandLine {
       super(type, name);
       this.aliases = aliases.length > 0
           ? Collections.unmodifiableSet(Arrays.stream(aliases)
-              .peek((alias) -> require(alias, STRING_NON_WHITESPACED))
+              .peek((alias) -> Checks.checkThat(alias, Strings.isNonWhitespaced(alias)))
               .filter((alias) -> !alias.equals(name))
               .collect(Collectors.<String, Set<String>>toCollection(LinkedHashSet::new)))
           : Collections.emptySet();
@@ -990,7 +993,8 @@ public class CommandLine {
      * @param buffer The buffer to append.
      * @return A reference to the specified buffer.
      */
-    @Override public CharBuffer toString(CharBuffer buffer) {
+    @Override
+    public CharBuffer toString(CharBuffer buffer) {
       // <LB>
       buffer.append(required ? "<" : "[");
       // [ATTRS]
@@ -1097,7 +1101,8 @@ public class CommandLine {
      * @param buffer The buffer to append.
      * @return A reference to the specified buffer.
      */
-    @Override public CharBuffer toString(CharBuffer buffer) {
+    @Override
+    public CharBuffer toString(CharBuffer buffer) {
       // <LB>
       buffer.append(required ? "<" : "[");
       // [ATTRS]
